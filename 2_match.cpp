@@ -5,7 +5,6 @@
 using namespace cv;
 using namespace std;
 #define MAX_TESTS 4
-
 struct Minutiae {
     int x, y;
     // 1 for ridge ending, 3 for bifurcation
@@ -63,10 +62,9 @@ int matchMinutiae(const vector<Minutiae>& minutiae1, const vector<Minutiae>& min
 }
 
 void printResult(int arr[]) {
-    std::cout << "Number of matching Munutiae Points with Control Image..." << std::endl;
-    int arr1[4] = {6,13,3,8};
-    for(int index=0;index<MAX_TESTS;index++) {
-        std::cout << std::endl << "Test Image " << (index+1) << ": " << arr1[index];
+    std::cout << "Number of matching Minutiae Points with Control Image..." << std::endl;
+    for(int index=0; index<MAX_TESTS; index++) {
+        std::cout << std::endl << "Test Image " << (index+1) << ": " << arr[index];
     }
 }
 
