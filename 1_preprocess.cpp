@@ -21,11 +21,18 @@ void preprocessImage(const char* inputPath, const char* outputPath) {
 }
 
 int main() {
-    const char* inputPath = "./assets/control.png";
-    const char* outputPath = "./assets/binary/test_1.png";
+    const std::string inputDir = "./assets/";
+    const std::string outputDir = "./assets/binary/";
 
-    preprocessImage(inputPath, outputPath);
+    // Iterate through all files in the input directory
+    for (const auto& entry : fs::directory_iterator(inputDir)) {
+        if (entry.is_regular_file() && entry.path().extension() == ".tif") {
+            std::string inputPath = entry.path().string();
+            std::string outputPath = outputDir + entry.path().filename().string();
+            preprocessImage(inputPath, outputPath);
+        }
+    }
 
-    std::cout << "Preprocessing completed. Binary image saved to" << outputPath << std::endl;
+    std::cout << "Preprocessing completed for all TIFF files." << std::endl;
     return EXIT_SUCCESS;
 }
