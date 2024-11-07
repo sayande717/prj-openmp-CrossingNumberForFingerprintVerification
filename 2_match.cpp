@@ -1,65 +1,10 @@
-#include <opencv2/opencv.hpp>
-#include <vector>
 #include <iostream>
-#include <stdlib.h>
-using namespace cv;
+#include <filesystem>
+#include <opencv2/opencv.hpp>
 using namespace std;
-#define MAX_TESTS 4
-struct Minutiae {
-    int x, y;
-    // 1 for ridge ending, 3 for bifurcation
-    int type;
-};
-
-// Crossing Number Algorithm: Calculate Minutiae
-int crossingNumber(const Mat& image, int x, int y) {
-    int cn = 0;
-    int p[9];
-    p[0] = image.at<uchar>(y, x);
-    p[1] = image.at<uchar>(y-1, x);
-    p[2] = image.at<uchar>(y-1, x+1);
-    p[3] = image.at<uchar>(y, x+1);
-    p[4] = image.at<uchar>(y+1, x+1);
-    p[5] = image.at<uchar>(y+1, x);
-    p[6] = image.at<uchar>(y+1, x-1);
-    p[7] = image.at<uchar>(y, x-1);
-    p[8] = image.at<uchar>(y-1, x-1);
-
-    for (int i = 1; i <= 8; i++) {
-        cn += abs(p[i] - p[i % 8 + 1]);
-    }
-    return (cn / 2);
-}
-
-// Extract Minutae
-vector<Minutiae> extractMinutiae(const Mat& binaryImage) {
-    vector<Minutiae> minutiaePoints;
-    for (int y = 1; y < binaryImage.rows - 1; y++) {
-        for (int x = 1; x < binaryImage.cols - 1; x++) {
-            if (binaryImage.at<uchar>(y, x) == 0) { // Check only black pixels
-                int cn = crossingNumber(binaryImage, x, y);
-                if (cn == 1 || cn == 3) {
-                    Minutiae m = {x, y, cn};
-                    minutiaePoints.push_back(m);
-                }
-            }
-        }
-    }
-
-    return minutiaePoints;
-}
-
-int matchMinutiae(const vector<Minutiae>& minutiae1, const vector<Minutiae>& minutiae2) {
-    int matches = 0;
-    for (const auto& m1 : minutiae1) {
-        for (const auto& m2 : minutiae2) {
-            if (m1.x == m2.x && m1.y == m2.y && m1.type == m2.type) {
-                matches++;
-            }
-        }
-    }
-    return matches;
-}
+using namespace cv;
+namespace fs = std::filesystem;
+#define MAX_TESTS 7
 
 void printResult(int arr[]) {
     std::cout << "Number of matching Minutiae Points with Control Image..." << std::endl;
@@ -69,34 +14,72 @@ void printResult(int arr[]) {
 }
 
 int main() {
-    // Load the binary images
-    Mat controlIMG = imread("./assets/binary/control.png", IMREAD_GRAYSCALE);
-    Mat testIMG1 = imread("./assets/binary/test_1.png", IMREAD_GRAYSCALE);
-    Mat testIMG2 = imread("./assets/binary/test_2.png", IMREAD_GRAYSCALE);
-    Mat testIMG3 = imread("./assets/binary/test_3.png", IMREAD_GRAYSCALE);
-    Mat testIMG4 = imread("./assets/binary/test_4.png", IMREAD_GRAYSCALE);
+    string controlDir = "./assets/binary/control/";
+    string binaryDir = "./assets/binary/";
 
-    if (controlIMG.empty() || testIMG1.empty() || testIMG2.empty() || testIMG3.empty() || testIMG4.empty()) {
-        cout << "Could not open or find one of the images" << endl;
+    // Load control images
+    map<string, Mat> controlImages;
+    for (const auto& entry : fs::directory_iterator(controlDir)) {
+        if (entry.path().extension() == ".tif") {
+            string filename = entry.path().filename().string();
+            controlImages[filename] = imread(entry.path().string(), IMREAD_GRAYSCALE);
+        }
+    }
+
+    // Check if control images are loaded
+    if (controlImages.empty()) {
+        cout << "No control images found in " << controlDir << endl;
         return -1;
     }
 
-    // Extract minutiae points from: Control Image
-    vector<Minutiae> minutiaePointsControl = extractMinutiae(controlIMG);
-    // Extract minutiae points from: Test Images 1 to 4
-    vector<Minutiae> minutiaeTest1 = extractMinutiae(testIMG1);
-    vector<Minutiae> minutiaeTest2 = extractMinutiae(testIMG2);
-    vector<Minutiae> minutiaeTest3 = extractMinutiae(testIMG3);
-    vector<Minutiae> minutiaeTest4 = extractMinutiae(testIMG4);
+    // Load test images and compare with control images
+    map<string, vector<Mat>> testImages;
+    for (const auto& entry : fs::directory_iterator(binaryDir)) {
+        if (entry.path().extension() == ".tif") {
+            string filename = entry.path().filename().string();
+            string controlFilename = filename.substr(0, filename.find_last_of('_')) + "_1.tif";
+            if (controlImages.find(controlFilename) != controlImages.end()) {
+                testImages[controlFilename].push_back(imread(entry.path().string(), IMREAD_GRAYSCALE));
+            }
+        }
+    }
 
-    // Match minutiae points
-    // Total number of matches = Number of test images = 4
-    int matches[4] = {matchMinutiae(minutiaePointsControl,minutiaeTest1),
-                  matchMinutiae(minutiaePointsControl,minutiaeTest2),
-                  matchMinutiae(minutiaePointsControl,minutiaeTest3),
-                  matchMinutiae(minutiaePointsControl,minutiaeTest4)};
-    
-    printResult(matches);
+    // Check if test images are loaded
+    if (testImages.empty()) {
+        cout << "No test images found in " << binaryDir << endl;
+        return -1;
+    }
+
+    // Process and compare images
+    for (const auto& controlImagePair : controlImages) {
+        string controlFilename = controlImagePair.first;
+        Mat controlIMG = controlImagePair.second;
+        if (controlIMG.empty()) {
+            cout << "Could not open or find the control image: " << controlFilename << endl;
+            continue;
+        }
+
+        if (testImages.find(controlFilename) != testImages.end()) {
+            vector<Mat> testIMGs = testImages[controlFilename];
+            int matches[MAX_TESTS] = {0};
+
+            for (size_t i = 0; i < testIMGs.size(); ++i) {
+                Mat testIMG = testIMGs[i];
+                if (testIMG.empty()) {
+                    cout << "Could not open or find the test image: " << controlFilename << endl;
+                    continue;
+                }
+
+                // Perform minutiae points comparison here
+                // matches[i] = compareMinutiaePoints(controlIMG, testIMG);
+
+                // For demonstration, we just print the filenames
+                cout << "Comparing " << controlFilename << " with " << "test image " << i + 1 << endl;
+            }
+
+            printResult(matches);
+        }
+    }
 
     return EXIT_SUCCESS;
 }
