@@ -51,7 +51,8 @@ int main() {
     double endParallel = omp_get_wtime();
 
     std::cout << "Preprocessing completed for all TIFF files." << std::endl;
-    // Output results
+    
+    // OUTPUT results
     std::cout << "Serial Execution Time: " << (endSerial - startSerial) << " seconds" << std::endl;
     std::cout << "Parallel Execution Time: " << (endParallel - startParallel) << " seconds" << std::endl;
 
